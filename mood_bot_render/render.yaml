@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: mood-bot
+    env: python
+    buildCommand: ""
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: your_telegram_token_here
+      - key: OPENAI_API_KEY
+        value: your_openai_key_here
