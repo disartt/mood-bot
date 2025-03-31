@@ -1,4 +1,3 @@
-
 import logging
 import os
 from aiogram import Bot, Dispatcher, types
@@ -7,10 +6,10 @@ from aiogram.utils import executor
 import openai
 from dotenv import load_dotenv
 
-# Load env variables from custom file
+# Load env variables
 load_dotenv("mood_bot.env")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -19,13 +18,11 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-# Configure OpenAI with project ID
-client = openai.OpenAI(
-    api_key=OPENAI_API_KEY,
-    project="proj_s6yqUdaRJg0KiMb3dEGZCrVM"
-)
+# Configure OpenRouter
+openai.api_base = "https://openrouter.ai/api/v1"
+openai.api_key = OPENROUTER_API_KEY
 
-# Simple keyboard
+# Keyboard
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 main_kb.add(KeyboardButton("🍽 Хочу в ресторан"))
 main_kb.add(KeyboardButton("🎬 Пойду в кино"))
@@ -48,9 +45,8 @@ async def handle_text(message: types.Message):
         await message.reply("Афиша на сегодня: ... (в следующей версии)")
     else:
         try:
-            # GPT-помощник: дружелюбный советник по досугу
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            response = openai.ChatCompletion.create(
+                model="openai/gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
                     {"role": "user", "content": user_text}
