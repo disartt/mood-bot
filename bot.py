@@ -14,8 +14,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-# Configure webhook settings
-WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")  # Render задаёт это автоматически
+# Webhook settings (вшито вручную)
+WEBHOOK_HOST = "https://mood-bot-frbb.onrender.com"
 WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
@@ -68,6 +68,7 @@ async def handle_text(message: types.Message):
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
+    logging.info(f"Webhook установлен: {WEBHOOK_URL}")
 
 async def on_shutdown(dp):
     await bot.delete_webhook()
