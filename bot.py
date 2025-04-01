@@ -55,9 +55,16 @@ async def handle_location(message: types.Message):
     await message.reply("Ищу рестораны рядом... 🍽", reply_markup=main_kb)
 
     try:
+        delta = 0.01  # радиус в градусах ~ 1 км
+        left = lon - delta
+        top = lat + delta
+        right = lon + delta
+        bottom = lat - delta
+
         url = (
             f"https://nominatim.openstreetmap.org/search?"
-            f"q=restaurant&format=json&limit=5&lat={lat}&lon={lon}"
+            f"q=restaurant&format=json&limit=5&"
+            f"viewbox={left},{top},{right},{bottom}&bounded=1"
         )
         headers = {"User-Agent": "MoodBot"}
         async with httpx.AsyncClient() as session:
@@ -73,9 +80,9 @@ async def handle_location(message: types.Message):
 
         for place in data:
             name = place.get("display_name", "Без названия")
-            lat = place.get("lat")
-            lon = place.get("lon")
-            maps_url = f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}"
+            place_lat = place.get("lat")
+            place_lon = place.get("lon")
+            maps_url = f"https://www.openstreetmap.org/?mlat={place_lat}&mlon={place_lon}#map=18/{place_lat}/{place_lon}"
             text = f"🍴 <b>{name}</b>\n🗺 <a href='{maps_url}'>Открыть на карте</a>"
             await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
 
