@@ -51,7 +51,7 @@ async def send_welcome(message: types.Message):
 async def handle_location(message: types.Message):
     lat = message.location.latitude
     lon = message.location.longitude
-    await message.reply("Ищу рестораны рядом... 🍽")
+    await message.reply("Ищу рестораны рядом... 🍽", reply_markup=main_kb)
 
     try:
         url = (
@@ -63,7 +63,7 @@ async def handle_location(message: types.Message):
             data = response.json()
 
         if not data.get("features"):
-            await message.reply("Не удалось найти рестораны рядом 😕")
+            await message.reply("Не удалось найти рестораны рядом 😕", reply_markup=main_kb)
             return
 
         for place in data["features"]:
@@ -74,10 +74,10 @@ async def handle_location(message: types.Message):
             msg = f"🍴 <b>{name}</b>\n📍 {address}"
             if url:
                 msg += f"\n🌐 <a href='{url}'>Сайт</a>"
-            await message.reply(msg, parse_mode="HTML")
+            await message.reply(msg, parse_mode="HTML", reply_markup=main_kb)
 
     except Exception:
-        await message.reply("Произошла ошибка при поиске ресторанов 😞")
+        await message.reply("Произошла ошибка при поиске ресторанов 😞", reply_markup=main_kb)
         logging.error("Yandex API error:\n" + traceback.format_exc())
 
 @dp.message_handler()
@@ -87,22 +87,22 @@ async def handle_text(message: types.Message):
     if "ресторан" in user_text:
         await message.reply("Отправь геолокацию кнопкой ниже 📍", reply_markup=main_kb)
     elif "кино" in user_text:
-        await message.reply("Сейчас в кино: «Дюна 2», «Оппенгеймер»... (в следующей версии)")
+        await message.reply("Сейчас в кино: «Дюна 2», «Оппенгеймер»... (в следующей версии)", reply_markup=main_kb)
     elif "театр" in user_text or "выставка" in user_text:
-        await message.reply("Афиша на сегодня: ... (в следующей версии)")
+        await message.reply("Афиша на сегодня: ... (в следующей версии)", reply_markup=main_kb)
     else:
         try:
             response = client.chat.completions.create(
                 model="openchat/openchat-7b:free",
                 messages=[
-                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
+                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе. Отвечай чётко, без лишней воды, не больше 4 пунктов."},
                     {"role": "user", "content": user_text}
                 ]
             )
             idea = response.choices[0].message.content
-            await message.reply(idea)
+            await message.reply(idea, reply_markup=main_kb)
         except Exception:
-            await message.reply("Произошла ошибка при обращении к GPT 😕")
+            await message.reply("Произошла ошибка при обращении к GPT 😕", reply_markup=main_kb)
             logging.error("GPT error:\n" + traceback.format_exc())
 
 async def on_startup(dp):
