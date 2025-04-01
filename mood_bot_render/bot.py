@@ -8,7 +8,7 @@ from aiogram.utils.executor import start_webhook
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load env variables
+# Load environment variables
 load_dotenv("mood_bot.env")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -52,7 +52,7 @@ async def send_welcome(message: types.Message):
 async def handle_location(message: types.Message):
     lat = message.location.latitude
     lon = message.location.longitude
-    logging.info(f"📍 Received location: {lat}, {lon}")
+    logging.info(f"📍 Получена геолокация: {lat}, {lon}")
     await message.reply("Ищу рестораны рядом... 🍽", reply_markup=main_kb)
 
     try:
@@ -85,24 +85,24 @@ async def handle_location(message: types.Message):
 @dp.message_handler()
 async def handle_text(message: types.Message):
     user_text = message.text.lower()
-    logging.info(f"📝 Received text: {user_text}")
+    logging.info(f"📝 Получено сообщение: {user_text}")
 
     if "ресторан" in user_text:
-        logging.info("🍽 Trigger: ресторан")
+        logging.info("🍽 Запрос: ресторан")
         await message.reply("Отправь геолокацию кнопкой ниже 📍", reply_markup=main_kb)
     elif "кино" in user_text:
-        logging.info("🎬 Trigger: кино")
+        logging.info("🎬 Запрос: кино")
         await message.reply("Сейчас в кино: «Дюна 2», «Оппенгеймер»... (в следующей версии)", reply_markup=main_kb)
     elif "театр" in user_text or "выставка" in user_text:
-        logging.info("🎭 Trigger: театр/выставка")
+        logging.info("🎭 Запрос: театр/выставка")
         await message.reply("Афиша на сегодня: ... (в следующей версии)", reply_markup=main_kb)
     else:
         try:
-            logging.info("🤖 Trigger: GPT")
+            logging.info("🤖 GPT-запрос")
             response = client.chat.completions.create(
                 model="openchat/openchat-7b:free",
                 messages=[
-                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе. Отвечай кратко, до 4 пунктов, без воды."},
+                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе. Отвечай кратко и понятно, не более 4 пунктов."},
                     {"role": "user", "content": user_text}
                 ]
             )
