@@ -3,8 +3,9 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
+import traceback
 
 # Load env variables
 load_dotenv("mood_bot.env")
@@ -14,9 +15,9 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # Logging
 logging.basicConfig(level=logging.INFO)
 
-# Webhook settings (вручную)
+# Webhook settings
 WEBHOOK_HOST = "https://mood-bot-frbb.onrender.com"
-WEBHOOK_PATH = f"/webhook"
+WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 5000))
@@ -25,10 +26,12 @@ WEBAPP_PORT = int(os.getenv("PORT", 5000))
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-# Configure OpenRouter
-openai.api_base = "https://openrouter.ai/api/v1"
-openai.api_key = OPENROUTER_API_KEY
-logging.info(f"🔑 OpenRouter key starts with: {openai.api_key[:8]}...")
+# Init OpenRouter client
+client = OpenAI(
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1"
+)
+logging.info(f"🔑 OpenRouter key starts with: {OPENROUTER_API_KEY[:8]}...")
 
 # Keyboard
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -53,7 +56,7 @@ async def handle_text(message: types.Message):
         await message.reply("Афиша на сегодня: ... (в следующей версии)")
     else:
         try:
-            response = openai.chat.completions.create(
+            response = client.chat.completions.create(
                 model="openai/gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
@@ -62,9 +65,8 @@ async def handle_text(message: types.Message):
             )
             idea = response.choices[0].message.content
             await message.reply(idea)
-        except Exception as e:
+        except Exception:
             await message.reply("Произошла ошибка при обращении к GPT 😕")
-            import traceback
             logging.error("GPT error:\n" + traceback.format_exc())
 
 async def on_startup(dp):
