@@ -8,11 +8,10 @@ from aiogram.utils.executor import start_webhook
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load env variables
 load_dotenv("mood_bot.env")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -45,64 +44,62 @@ main_kb.add(KeyboardButton("🤷‍♂️ Мне скучно"))
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    logging.info("Received /start")
+    logging.info("▶️ /start")
     await message.answer("Привет! Что хочешь сегодня сделать?", reply_markup=main_kb)
 
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def handle_location(message: types.Message):
     lat = message.location.latitude
     lon = message.location.longitude
-    logging.info(f"📍 Получена геолокация: {lat}, {lon}")
+    logging.info(f"📍 Геолокация получена: {lat}, {lon}")
     await message.reply("Ищу рестораны рядом... 🍽", reply_markup=main_kb)
 
     try:
         url = (
-            f"https://search-maps.yandex.ru/v1/?apikey={YANDEX_API_KEY}"
-            f"&text=ресторан&type=biz&lang=ru_RU&ll={lon},{lat}&spn=0.01,0.01&results=5"
+            f"https://nominatim.openstreetmap.org/search?"
+            f"q=restaurant&format=json&limit=5&lat={lat}&lon={lon}"
         )
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
+        headers = {"User-Agent": "MoodBot"}
+        async with httpx.AsyncClient() as session:
+            response = await session.get(url, headers=headers)
             data = response.json()
 
-        if not data.get("features"):
+        logging.info("📡 Ответ от OpenStreetMap:")
+        logging.info(data)
+
+        if not data:
             await message.reply("Не удалось найти рестораны рядом 😕", reply_markup=main_kb)
             return
 
-        for place in data["features"]:
-            props = place["properties"]
-            name = props["CompanyMetaData"]["name"]
-            address = props["CompanyMetaData"].get("address", "Адрес неизвестен")
-            url = props["CompanyMetaData"].get("url", "")
-            msg = f"🍴 <b>{name}</b>\n📍 {address}"
-            if url:
-                msg += f"\n🌐 <a href='{url}'>Сайт</a>"
-            await message.reply(msg, parse_mode="HTML", reply_markup=main_kb)
+        for place in data:
+            name = place.get("display_name", "Без названия")
+            lat = place.get("lat")
+            lon = place.get("lon")
+            maps_url = f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=18/{lat}/{lon}"
+            text = f"🍴 <b>{name}</b>\n🗺 <a href='{maps_url}'>Открыть на карте</a>"
+            await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
 
     except Exception:
         await message.reply("Произошла ошибка при поиске ресторанов 😞", reply_markup=main_kb)
-        logging.error("Yandex API error:\n" + traceback.format_exc())
+        logging.error("❌ Ошибка при работе с OSM:\n" + traceback.format_exc())
 
 @dp.message_handler()
 async def handle_text(message: types.Message):
     user_text = message.text.lower()
-    logging.info(f"📝 Получено сообщение: {user_text}")
+    logging.info(f"💬 Текст от пользователя: {user_text}")
 
     if "ресторан" in user_text:
-        logging.info("🍽 Запрос: ресторан")
         await message.reply("Отправь геолокацию кнопкой ниже 📍", reply_markup=main_kb)
     elif "кино" in user_text:
-        logging.info("🎬 Запрос: кино")
         await message.reply("Сейчас в кино: «Дюна 2», «Оппенгеймер»... (в следующей версии)", reply_markup=main_kb)
     elif "театр" in user_text or "выставка" in user_text:
-        logging.info("🎭 Запрос: театр/выставка")
         await message.reply("Афиша на сегодня: ... (в следующей версии)", reply_markup=main_kb)
     else:
         try:
-            logging.info("🤖 GPT-запрос")
             response = client.chat.completions.create(
                 model="openchat/openchat-7b:free",
                 messages=[
-                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе. Отвечай кратко и понятно, не более 4 пунктов."},
+                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
                     {"role": "user", "content": user_text}
                 ]
             )
@@ -129,5 +126,3 @@ if __name__ == '__main__':
         host=WEBAPP_HOST,
         port=WEBAPP_PORT,
     )
-
-
