@@ -5,14 +5,12 @@ import httpx
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
-from openai import OpenAI
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load env variables
 load_dotenv("mood_bot.env")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-YANDEX_API_KEY = os.getenv("YANDEX_API_KEY")
+FOURSQUARE_API_KEY = os.getenv("FOURSQUARE_API_KEY")
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -28,89 +26,120 @@ WEBAPP_PORT = int(os.getenv("PORT", 5000))
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-# Init OpenRouter client
-client = OpenAI(
-    api_key=OPENROUTER_API_KEY,
-    base_url="https://openrouter.ai/api/v1"
-)
-logging.info(f"🔑 OpenRouter key starts with: {OPENROUTER_API_KEY[:8]}...")
+user_last_query = {}
 
 # Keyboard
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
-main_kb.add(KeyboardButton("🍽 Хочу в ресторан"))
-main_kb.add(KeyboardButton("📍 Отправить геолокацию", request_location=True))
-main_kb.add(KeyboardButton("🎬 Пойду в кино"))
-main_kb.add(KeyboardButton("🎭 Театр / выставка"))
-main_kb.add(KeyboardButton("🤷‍♂️ Мне скучно"))
+main_kb.add(
+    KeyboardButton("🍽 Ресторан"),
+    KeyboardButton("🎬 Кино")
+)
+main_kb.add(
+    KeyboardButton("🎭 Театр"),
+    KeyboardButton("🖼 Музей")
+)
+main_kb.add(
+    KeyboardButton("🤷‍♂️ Мне скучно"),
+    KeyboardButton("📍 Отправить геолокацию", request_location=True)
+)
 
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
-    logging.info("Received /start")
     await message.answer("Привет! Что хочешь сегодня сделать?", reply_markup=main_kb)
+
+async def search_foursquare_places(lat, lon, query, message):
+    try:
+        headers = {
+            "Authorization": FOURSQUARE_API_KEY,
+            "Accept": "application/json"
+        }
+        params = {
+            "ll": f"{lat},{lon}",
+            "query": query,
+            "limit": 5,
+            "sort": "RELEVANCE",
+            "radius": 3000  # ← Расширенный радиус поиска (в метрах)
+        }
+        url = "https://api.foursquare.com/v3/places/search"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params)
+            data = response.json()
+
+        if "results" not in data or not data["results"]:
+            await message.reply("Ничего не найдено поблизости 😕", reply_markup=main_kb)
+            return
+
+        for place in data["results"]:
+            name = place.get("name", "Без названия")
+            location = place.get("location", {})
+            address = location.get("formatted_address", "Адрес неизвестен")
+            lat = location.get("lat")
+            lon = location.get("lng")
+            maps_url = f"https://maps.google.com/?q={lat},{lon}"
+            rating = place.get("rating", "—")
+            text = f"📍 <b>{name}</b>\n📍 {address}\n⭐ Рейтинг: {rating}\n<a href='{maps_url}'>Открыть на карте</a>"
+            await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
+
+        await message.reply("🔁 Хочешь поискать ещё? Выбери категорию ниже 👇", reply_markup=main_kb)
+
+    except Exception:
+        await message.reply("Произошла ошибка при поиске 😞", reply_markup=main_kb)
+        logging.error("Foursquare Error:\n" + traceback.format_exc())
 
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def handle_location(message: types.Message):
     lat = message.location.latitude
     lon = message.location.longitude
-    logging.info(f"📍 Получена геолокация: {lat}, {lon}")
-    await message.reply("Ищу рестораны рядом... 🍽", reply_markup=main_kb)
-
-    try:
-        url = (
-            f"https://search-maps.yandex.ru/v1/?apikey={YANDEX_API_KEY}"
-            f"&text=ресторан&type=biz&lang=ru_RU&ll={lon},{lat}&spn=0.01,0.01&results=5"
-        )
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            data = response.json()
-
-        if not data.get("features"):
-            await message.reply("Не удалось найти рестораны рядом 😕", reply_markup=main_kb)
-            return
-
-        for place in data["features"]:
-            props = place["properties"]
-            name = props["CompanyMetaData"]["name"]
-            address = props["CompanyMetaData"].get("address", "Адрес неизвестен")
-            url = props["CompanyMetaData"].get("url", "")
-            msg = f"🍴 <b>{name}</b>\n📍 {address}"
-            if url:
-                msg += f"\n🌐 <a href='{url}'>Сайт</a>"
-            await message.reply(msg, parse_mode="HTML", reply_markup=main_kb)
-
-    except Exception:
-        await message.reply("Произошла ошибка при поиске ресторанов 😞", reply_markup=main_kb)
-        logging.error("Yandex API error:\n" + traceback.format_exc())
+    user_id = message.from_user.id
+    query = user_last_query.get(user_id, "restaurant")
+    await message.reply(f"🔎 Ищу поблизости: {query}", reply_markup=main_kb)
+    await search_foursquare_places(lat, lon, query, message)
 
 @dp.message_handler()
 async def handle_text(message: types.Message):
-    user_text = message.text.lower()
-    logging.info(f"📝 Получено сообщение: {user_text}")
+    text = message.text.lower()
+    user_id = message.from_user.id
 
-    if "ресторан" in user_text:
-        logging.info("🍽 Запрос: ресторан")
-        await message.reply("Отправь геолокацию кнопкой ниже 📍", reply_markup=main_kb)
-    elif "кино" in user_text:
-        logging.info("🎬 Запрос: кино")
-        await message.reply("Сейчас в кино: «Дюна 2», «Оппенгеймер»... (в следующей версии)", reply_markup=main_kb)
-    elif "театр" in user_text or "выставка" in user_text:
-        logging.info("🎭 Запрос: театр/выставка")
-        await message.reply("Афиша на сегодня: ... (в следующей версии)", reply_markup=main_kb)
+    if "ресторан" in text:
+        user_last_query[user_id] = "restaurant"
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду лучшие рестораны рядом 📍", reply_markup=main_kb)
+    elif "кино" in text:
+        user_last_query[user_id] = "cinema"
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду кино рядом 🎬", reply_markup=main_kb)
+    elif "театр" in text:
+        user_last_query[user_id] = "theatre"
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду театр рядом 🎭", reply_markup=main_kb)
+    elif "музей" in text:
+        user_last_query[user_id] = "museum"
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду музей рядом 🖼", reply_markup=main_kb)
+    elif "скучно" in text:
+        await message.reply("Выбери что-нибудь из меню и проведи время с удовольствием!", reply_markup=main_kb)
     else:
+        query = user_last_query.get(user_id)
+        if not query:
+            await message.reply("Сначала выбери категорию досуга из меню выше ☝️", reply_markup=main_kb)
+            return
+
         try:
-            logging.info("🤖 GPT-запрос")
-            response = client.chat.completions.create(
-                model="openchat/openchat-7b:free",
-                messages=[
-                    {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе. Отвечай кратко и понятно, не более 4 пунктов."},
-                    {"role": "user", "content": user_text}
-                ]
-            )
-            idea = response.choices[0].message.content
-            await message.reply(idea, reply_markup=main_kb)
+            headers = {"User-Agent": "MoodBot"}
+            url = f"https://nominatim.openstreetmap.org/search?q={text}&format=json&limit=1"
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, headers=headers)
+                results = resp.json()
+
+            if not results:
+                await message.reply("Не удалось найти такое место. Попробуй другой адрес 🗺", reply_markup=main_kb)
+                return
+
+            lat = float(results[0]["lat"])
+            lon = float(results[0]["lon"])
+            await message.reply(f"📍 Нашёл: {results[0]['display_name']}\n🔎 Ищу поблизости: {query}", reply_markup=main_kb)
+            await search_foursquare_places(lat, lon, query, message)
+
         except Exception:
-            await message.reply("Произошла ошибка при обращении к GPT 😕", reply_markup=main_kb)
-            logging.error("GPT error:\n" + traceback.format_exc())
+            await message.reply("Ошибка при определении местоположения 😞", reply_markup=main_kb)
+            logging.error("GeoText Error:\n" + traceback.format_exc())
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
@@ -129,5 +158,3 @@ if __name__ == '__main__':
         host=WEBAPP_HOST,
         port=WEBAPP_PORT,
     )
-
-
