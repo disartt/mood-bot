@@ -47,15 +47,7 @@ main_kb.add(
 async def send_welcome(message: types.Message):
     await message.answer("Привет! Что хочешь сегодня сделать?", reply_markup=main_kb)
 
-@dp.message_handler(content_types=types.ContentType.LOCATION)
-async def handle_location(message: types.Message):
-    lat = message.location.latitude
-    lon = message.location.longitude
-    user_id = message.from_user.id
-
-    query_type = user_last_query.get(user_id, "restaurant")
-    await message.reply(f"Ищу поблизости: {query_type}…", reply_markup=main_kb)
-
+async def search_places(lat, lon, query_type, message):
     try:
         delta = 0.01
         left = lon - delta
@@ -85,12 +77,20 @@ async def handle_location(message: types.Message):
             text = f"📍 <b>{name}</b>\n<a href='{maps_url}'>Открыть на карте</a>"
             await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
 
-        # 💡 Вернуть пользователя к меню
         await message.reply("🔁 Хочешь поискать ещё? Выбери категорию ниже 👇", reply_markup=main_kb)
 
     except Exception:
         await message.reply("Произошла ошибка при поиске 😞", reply_markup=main_kb)
         logging.error("Ошибка:\n" + traceback.format_exc())
+
+@dp.message_handler(content_types=types.ContentType.LOCATION)
+async def handle_location(message: types.Message):
+    lat = message.location.latitude
+    lon = message.location.longitude
+    user_id = message.from_user.id
+    query_type = user_last_query.get(user_id, "restaurant")
+    await message.reply(f"Ищу поблизости: {query_type}…", reply_markup=main_kb)
+    await search_places(lat, lon, query_type, message)
 
 @dp.message_handler()
 async def handle_text(message: types.Message):
@@ -99,20 +99,44 @@ async def handle_text(message: types.Message):
 
     if "ресторан" in text:
         user_last_query[user_id] = "restaurant"
-        await message.reply("Отправь геолокацию, и я найду рестораны рядом 📍", reply_markup=main_kb)
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду рестораны рядом 📍", reply_markup=main_kb)
     elif "кино" in text:
         user_last_query[user_id] = "cinema"
-        await message.reply("Отправь геолокацию, и я найду кино рядом 📍", reply_markup=main_kb)
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду кино рядом 📍", reply_markup=main_kb)
     elif "театр" in text:
         user_last_query[user_id] = "theatre"
-        await message.reply("Отправь геолокацию, и я найду театры поблизости 🎭", reply_markup=main_kb)
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду театры поблизости 🎭", reply_markup=main_kb)
     elif "музей" in text:
         user_last_query[user_id] = "museum"
-        await message.reply("Отправь геолокацию, и я найду музеи поблизости 🖼", reply_markup=main_kb)
+        await message.reply("Отправь геолокацию или напиши адрес — и я найду музеи поблизости 🖼", reply_markup=main_kb)
     elif "скучно" in text:
         await message.reply("Попробуй выбрать что-нибудь интересное из меню!", reply_markup=main_kb)
     else:
-        await message.reply("Выбери вариант из меню или отправь геолокацию.", reply_markup=main_kb)
+        # Обработка ручного ввода адреса
+        query_type = user_last_query.get(user_id)
+        if not query_type:
+            await message.reply("Сначала выбери категорию досуга из меню выше ☝️", reply_markup=main_kb)
+            return
+
+        try:
+            headers = {"User-Agent": "MoodBot"}
+            url = f"https://nominatim.openstreetmap.org/search?q={text}&format=json&limit=1"
+            async with httpx.AsyncClient() as session:
+                response = await session.get(url, headers=headers)
+                results = response.json()
+
+            if not results:
+                await message.reply("Не удалось найти такое место. Попробуй другой адрес 🗺", reply_markup=main_kb)
+                return
+
+            lat = float(results[0]["lat"])
+            lon = float(results[0]["lon"])
+            await message.reply(f"📍 Нашёл: {results[0]['display_name']}\nИщу поблизости: {query_type}…", reply_markup=main_kb)
+            await search_places(lat, lon, query_type, message)
+
+        except Exception:
+            await message.reply("Ошибка при определении местоположения 😞", reply_markup=main_kb)
+            logging.error("GeoText Error:\n" + traceback.format_exc())
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
