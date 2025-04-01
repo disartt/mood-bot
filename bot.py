@@ -57,7 +57,7 @@ async def handle_text(message: types.Message):
     else:
         try:
             response = client.chat.completions.create(
-                model="openai/gpt-3.5-turbo",
+                model="mistralai/mistral-7b-instruct",  # БЕСПЛАТНАЯ МОДЕЛЬ
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
                     {"role": "user", "content": user_text}
