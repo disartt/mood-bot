@@ -11,10 +11,10 @@ load_dotenv("mood_bot.env")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# Setup logging
+# Logging
 logging.basicConfig(level=logging.INFO)
 
-# Webhook settings (вшито вручную)
+# Webhook settings (вручную)
 WEBHOOK_HOST = "https://mood-bot-frbb.onrender.com"
 WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -28,8 +28,9 @@ dp = Dispatcher(bot)
 # Configure OpenRouter
 openai.api_base = "https://openrouter.ai/api/v1"
 openai.api_key = OPENROUTER_API_KEY
+logging.info(f"🔑 OpenRouter key starts with: {openai.api_key[:8]}...")
 
-# Simple keyboard
+# Keyboard
 main_kb = ReplyKeyboardMarkup(resize_keyboard=True)
 main_kb.add(KeyboardButton("🍽 Хочу в ресторан"))
 main_kb.add(KeyboardButton("🎬 Пойду в кино"))
