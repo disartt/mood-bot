@@ -25,7 +25,7 @@ WEBAPP_PORT = int(os.getenv("PORT", 5000))
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-# Хранилище последнего типа запроса
+# Словарь для хранения последнего запроса пользователя
 user_last_query = {}
 
 # Кнопки
@@ -84,6 +84,9 @@ async def handle_location(message: types.Message):
             maps_url = f"https://www.openstreetmap.org/?mlat={place_lat}&mlon={place_lon}#map=18/{place_lat}/{place_lon}"
             text = f"📍 <b>{name}</b>\n<a href='{maps_url}'>Открыть на карте</a>"
             await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
+
+        # 💡 Вернуть пользователя к меню
+        await message.reply("🔁 Хочешь поискать ещё? Выбери категорию ниже 👇", reply_markup=main_kb)
 
     except Exception:
         await message.reply("Произошла ошибка при поиске 😞", reply_markup=main_kb)
