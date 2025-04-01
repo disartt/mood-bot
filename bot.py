@@ -57,7 +57,7 @@ async def handle_text(message: types.Message):
     else:
         try:
             response = client.chat.completions.create(
-                model="mistralai/mistral-7b-instruct",  # БЕСПЛАТНАЯ МОДЕЛЬ
+                model="nousresearch/nous-capybara-7b:free",  # ✅ Реально бесплатная модель
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
                     {"role": "user", "content": user_text}
