@@ -15,7 +15,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 logging.basicConfig(level=logging.INFO)
 
 # Configure webhook settings
-WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")  # Render автоматически задаёт это
+WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")  # Render задаёт это автоматически
 WEBHOOK_PATH = f"/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEBAPP_HOST = "0.0.0.0"
@@ -52,7 +52,7 @@ async def handle_text(message: types.Message):
         await message.reply("Афиша на сегодня: ... (в следующей версии)")
     else:
         try:
-            response = openai.ChatCompletion.create(
+            response = openai.chat.completions.create(
                 model="openai/gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Ты дружелюбный помощник, советующий, как провести досуг в городе."},
