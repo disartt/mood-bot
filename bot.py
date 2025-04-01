@@ -25,7 +25,7 @@ WEBAPP_PORT = int(os.getenv("PORT", 5000))
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-# Хранилище последнего типа запроса (можно заменить на FSM или Redis)
+# Хранилище последнего типа запроса
 user_last_query = {}
 
 # Кнопки
@@ -53,7 +53,7 @@ async def handle_location(message: types.Message):
     lon = message.location.longitude
     user_id = message.from_user.id
 
-    query_type = user_last_query.get(user_id, "ресторан")
+    query_type = user_last_query.get(user_id, "restaurant")
     await message.reply(f"Ищу поблизости: {query_type}…", reply_markup=main_kb)
 
     try:
@@ -95,16 +95,16 @@ async def handle_text(message: types.Message):
     user_id = message.from_user.id
 
     if "ресторан" in text:
-        user_last_query[user_id] = "ресторан"
+        user_last_query[user_id] = "restaurant"
         await message.reply("Отправь геолокацию, и я найду рестораны рядом 📍", reply_markup=main_kb)
     elif "кино" in text:
-        user_last_query[user_id] = "кинотеатр"
+        user_last_query[user_id] = "cinema"
         await message.reply("Отправь геолокацию, и я найду кино рядом 📍", reply_markup=main_kb)
     elif "театр" in text:
-        user_last_query[user_id] = "театр"
+        user_last_query[user_id] = "theatre"
         await message.reply("Отправь геолокацию, и я найду театры поблизости 🎭", reply_markup=main_kb)
     elif "музей" in text:
-        user_last_query[user_id] = "музей"
+        user_last_query[user_id] = "museum"
         await message.reply("Отправь геолокацию, и я найду музеи поблизости 🖼", reply_markup=main_kb)
     elif "скучно" in text:
         await message.reply("Попробуй выбрать что-нибудь интересное из меню!", reply_markup=main_kb)
