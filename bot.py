@@ -65,7 +65,7 @@ async def handle_text(message: types.Message):
             await message.reply("Произошла ошибка при обращении к GPT 😕")
             import traceback
             logging.error("GPT error:
-" + traceback.format_exc())
+" + traceback.format_exc()) + traceback.format_exc())
 
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
