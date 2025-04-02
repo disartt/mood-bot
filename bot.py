@@ -58,7 +58,7 @@ async def search_foursquare_places(lat, lon, query, message):
             "query": query,
             "limit": 5,
             "sort": "RELEVANCE",
-            "radius": 3000  # ← Расширенный радиус поиска (в метрах)
+            "radius": 3000
         }
         url = "https://api.foursquare.com/v3/places/search"
 
@@ -76,9 +76,24 @@ async def search_foursquare_places(lat, lon, query, message):
             address = location.get("formatted_address", "Адрес неизвестен")
             lat = location.get("lat")
             lon = location.get("lng")
-            maps_url = f"https://maps.google.com/?q={lat},{lon}"
-            rating = place.get("rating", "—")
-            text = f"📍 <b>{name}</b>\n📍 {address}\n⭐ Рейтинг: {rating}\n<a href='{maps_url}'>Открыть на карте</a>"
+
+            # 📍 Защита от отсутствия координат
+            if lat and lon:
+                maps_url = f"https://maps.google.com/?q={lat},{lon}"
+            else:
+                maps_url = "https://maps.google.com"
+
+            # ⭐ Защита от отсутствия рейтинга
+            rating = place.get("rating")
+            if not rating:
+                rating = "Нет данных"
+
+            text = (
+                f"📍 <b>{name}</b>\n"
+                f"📍 {address}\n"
+                f"⭐ Рейтинг: {rating}\n"
+                f"<a href='{maps_url}'>Открыть на карте</a>"
+            )
             await message.reply(text, parse_mode="HTML", reply_markup=main_kb)
 
         await message.reply("🔁 Хочешь поискать ещё? Выбери категорию ниже 👇", reply_markup=main_kb)
