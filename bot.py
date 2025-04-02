@@ -2,10 +2,15 @@ import logging
 import os
 import traceback
 import httpx
+import asyncio
+import threading
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.executor import start_webhook
 from dotenv import load_dotenv
+
+from aiohttp import web
 
 # Load env variables
 load_dotenv("mood_bot.env")
@@ -77,13 +82,11 @@ async def search_foursquare_places(lat, lon, query, message):
             lat = location.get("lat")
             lon = location.get("lng")
 
-            # 📍 Защита от отсутствия координат
             if lat and lon:
                 maps_url = f"https://maps.google.com/?q={lat},{lon}"
             else:
                 maps_url = "https://maps.google.com"
 
-            # ⭐ Защита от отсутствия рейтинга
             rating = place.get("rating")
             if not rating:
                 rating = "Нет данных"
@@ -156,6 +159,7 @@ async def handle_text(message: types.Message):
             await message.reply("Ошибка при определении местоположения 😞", reply_markup=main_kb)
             logging.error("GeoText Error:\n" + traceback.format_exc())
 
+# Webhook lifecycle
 async def on_startup(dp):
     await bot.set_webhook(WEBHOOK_URL)
     logging.info(f"Webhook установлен: {WEBHOOK_URL}")
@@ -163,7 +167,21 @@ async def on_startup(dp):
 async def on_shutdown(dp):
     await bot.delete_webhook()
 
+# AIOHTTP handler for GET /
+async def handle_root(request):
+    return web.Response(text="MoodBot is alive ✅")
+
+# App for Render health checks
+def run_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_root)
+    web.run_app(app, host=WEBAPP_HOST, port=WEBAPP_PORT)
+
 if __name__ == '__main__':
+    # Запускаем aiohttp сервер в отдельном потоке
+    threading.Thread(target=run_web_server, daemon=True).start()
+
+    # Запускаем Telegram webhook
     start_webhook(
         dispatcher=dp,
         webhook_path=WEBHOOK_PATH,
